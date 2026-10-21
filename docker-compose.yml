@@ -14,8 +14,8 @@ services:
       test: ["CMD", "curl", "-f", "http://localhost"]
       interval: 15s
       timeout: 5s
-      retries: 3
-      start_period: 10s
+      retries: 10
+      start_period: 60s
     volumes:
      - ./vote:/usr/local/app
     ports:
