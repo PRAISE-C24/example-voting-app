@@ -25,6 +25,9 @@ CMD ["python", "app.py"]
 # final defines the stage that will bundle the application for production
 FROM base AS final
 
+# pip is only needed to install dependencies; remove it (and the libraries it bundles) from the runtime image
+RUN pip uninstall -y pip
+
 # Create an unprivileged user (numeric UID so Kubernetes can verify it later)
 RUN groupadd --system --gid 10001 app && \
     useradd --system --uid 10001 --gid app --no-create-home app
