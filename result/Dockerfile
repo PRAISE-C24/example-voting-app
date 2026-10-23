@@ -12,8 +12,9 @@ COPY package*.json ./
 # Reproducible install from package-lock.json, production dependencies only
 RUN npm ci --omit=dev && \
     npm cache clean --force && \
-    mv /usr/local/app/node_modules /node_modules
-
+    mv /usr/local/app/node_modules /node_modules && \
+    rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+    
 COPY --chown=node:node . .
 
 ENV PORT=8000
