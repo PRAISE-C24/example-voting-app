@@ -4,3 +4,17 @@ bin/
 obj/
 .vs/
 node_modules/
+backend.hcl
+tfplan
+*.tfplan
+tfplan
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfplan
+tfplan
+crash.log
+backend.hcl
