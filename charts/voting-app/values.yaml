@@ -1,0 +1,65 @@
+image:
+  registry: ghcr.io/praise-c24
+  tag: "7c1c55e3c584f545580d2799c0612648b8b1fab0"
+  pullPolicy: IfNotPresent
+
+vote:
+  image: voting-app-vote
+  tag: "7c1c55e3c584f545580d2799c0612648b8b1fab0"
+  replicas: 2
+  port: 8000
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+result:
+  image: voting-app-result
+  tag: "7c1c55e3c584f545580d2799c0612648b8b1fab0"
+  replicas: 2
+  port: 8000
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+worker:
+  image: voting-app-worker
+  tag: "7c1c55e3c584f545580d2799c0612648b8b1fab0"
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+db:
+  image: postgres:15.19-alpine@sha256:f7d23353e1b15400d22ebe31189f4d314b87a4c129cc400c8c2d8d4ca127bf81
+  user: postgres
+  password: postgres   # the app hardcodes these credentials; fine for a lab only
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+redis:
+  image: redis:8.10.2-alpine@sha256:3811787313eba226a2ef38658c6ccb91cd5e110edc89c37767de373120a0e5a0
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
