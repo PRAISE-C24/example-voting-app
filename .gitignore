@@ -4,10 +4,6 @@ bin/
 obj/
 .vs/
 node_modules/
-backend.hcl
-tfplan
-*.tfplan
-tfplan
 
 # Terraform
 .terraform/
