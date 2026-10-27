@@ -15,7 +15,12 @@ check() {  # check "<label>" "<command output>"
   fi
 }
 
-check "Terraform state entries" "$(cd infra/eks && terraform state list 2>/dev/null)"
+if state_out="$(cd infra/eks && terraform state list 2>&1)"; then
+  check "Terraform state entries" "$state_out"
+else
+  printf 'ERROR  could not read Terraform state: %s\n' "$state_out"
+  leftovers=1
+fi
 check "EKS clusters" "$(aws eks list-clusters --region "$REGION" --query 'clusters' --output text)"
 check "EC2 instances" "$(aws ec2 describe-instances --region "$REGION" \
   --filters "Name=tag:eks:cluster-name,Values=$CLUSTER" \
