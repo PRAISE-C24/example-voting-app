@@ -13,7 +13,9 @@ on:
       - "vote/**"
       - "result/**"
       - "worker/**"
-      - ".github/workflows/ci.yml"   # use your CI file's real name
+      - "docker-compose.yml"
+      - ".github/workflows/ci.yml" 
+      - ".github/workflows/app-deploy.yml"  # use your CI file's real name
 
 permissions:
   contents: read

@@ -22,7 +22,7 @@ RUN pip install watchdog
 ENV FLASK_ENV=development
 CMD ["python", "app.py"]
 
-# final defines the stage that will bundle the application for production
+# final defines a stage for production, where it'll run the application with gunicorn
 FROM base AS final
 
 # pip is only needed to install dependencies; remove it (and the libraries it bundles) from the runtime image
