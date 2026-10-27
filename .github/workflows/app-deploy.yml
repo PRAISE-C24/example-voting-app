@@ -142,6 +142,24 @@ jobs:
           helm rollback "$RELEASE" --namespace "$NAMESPACE" --wait --timeout 5m \
             || echo "Nothing to roll back to (probably the first install)."
 
+      - name: Show the app URLs
+        if: success()
+        run: |
+          for ing in vote result; do
+            host=""
+            for i in $(seq 1 30); do
+              host=$(kubectl get ingress "$ing" --namespace "$NAMESPACE" \
+                       -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || true)
+              [ -n "$host" ] && break
+              sleep 10
+            done
+            if [ -n "$host" ]; then
+              echo "$ing: http://$host" | tee -a "$GITHUB_STEP_SUMMARY"
+            else
+              echo "::warning::$ing has no address after 5 minutes. Check that the load balancer controller is running."
+            fi
+          done      
+
       - name: Show the result
         if: always()
         run: |
