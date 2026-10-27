@@ -1,0 +1,134 @@
+name: app-deploy
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  push:
+    branches: [main]
+    paths:
+      - "charts/**"
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit SHA to deploy, chart and images (blank = keep running images)"
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+  actions: read   # lets the job look up the latest successful CI run
+
+concurrency:
+  group: app-deploy
+  cancel-in-progress: false
+
+env:
+  CLUSTER_NAME: example-voting-app   # must match cluster_name in infra/eks
+  RELEASE: voting-app                # match your manual helm deploy
+  NAMESPACE: voting-app              # match your manual helm deploy
+  # Set only when CI or you chose an exact commit. Empty for chart-only pushes.
+  EXPLICIT_SHA: ${{ inputs.sha || github.event.workflow_run.head_sha }}
+  # Which commit the chart is taken from
+  CHART_REF: ${{ inputs.sha || github.event.workflow_run.head_sha || github.sha }}
+
+jobs:
+  check-cluster:
+    if: >-
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
+    runs-on: ubuntu-latest
+    outputs:
+      exists: ${{ steps.cluster.outputs.exists }}
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}   # read-only role, no approval needed
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Does the cluster exist?
+        id: cluster
+        run: |
+          if out=$(aws eks describe-cluster --name "$CLUSTER_NAME" --query cluster.status --output text 2>&1); then
+            [ "$out" = "ACTIVE" ] || { echo "Cluster status is $out, not ACTIVE"; exit 1; }
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif grep -q ResourceNotFoundException <<<"$out"; then
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::Cluster $CLUSTER_NAME does not exist, so there is nothing to deploy to."
+          else
+            echo "$out"; exit 1
+          fi
+
+  deploy:
+    needs: check-cluster
+    if: needs.check-cluster.outputs.exists == 'true'
+    runs-on: ubuntu-latest
+    environment: app-production   # your approval, and the only way to assume the deploy role
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.CHART_REF }}
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Point kubectl at the cluster
+        run: aws eks update-kubeconfig --name "$CLUSTER_NAME"
+
+      - name: Decide which image versions to run
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          helm version --short
+          if [ -n "$EXPLICIT_SHA" ]; then
+            MODE=set; TAG="$EXPLICIT_SHA"
+          elif helm status "$RELEASE" --namespace "$NAMESPACE" >/dev/null 2>&1; then
+            MODE=reuse; TAG=""
+          else
+            MODE=set
+            TAG=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow CI --branch main \
+                    --event push --status success --limit 1 --json headSha --jq '.[0].headSha')
+            [ -n "$TAG" ] || { echo "No release is running and no successful CI build exists to deploy."; exit 1; }
+          fi
+          if [ "$MODE" = set ]; then
+            [[ "$TAG" =~ ^[0-9a-f]{40}$ ]] || { echo "Not a full commit SHA: $TAG"; exit 1; }
+            echo "Deploying image tag $TAG" | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Keeping the image versions that are already running" | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG"  >> "$GITHUB_OUTPUT"
+
+      - name: Helm upgrade
+        id: helm
+        env:
+          MODE: ${{ steps.tag.outputs.mode }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          ARGS=(--namespace "$NAMESPACE" --create-namespace --wait --timeout 5m --history-max 10)
+          if [ "$MODE" = reuse ]; then
+            ARGS+=(--reset-then-reuse-values)
+          else
+            ARGS+=(--set image.tag="$TAG" --set vote.tag="$TAG" --set result.tag="$TAG" --set worker.tag="$TAG")
+          fi
+          helm upgrade --install "$RELEASE" charts/voting-app "${ARGS[@]}"
+
+      - name: Roll back if the upgrade failed
+        if: failure() && steps.helm.outcome == 'failure'
+        run: |
+          helm rollback "$RELEASE" --namespace "$NAMESPACE" --wait --timeout 5m \
+            || echo "Nothing to roll back to (probably the first install)."
+
+      - name: Show the result
+        if: always()
+        run: |
+          helm status "$RELEASE" --namespace "$NAMESPACE" || true
+          kubectl get pods,svc,ingress --namespace "$NAMESPACE" || true
