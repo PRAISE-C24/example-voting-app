@@ -53,6 +53,10 @@ if [[ -n "${CLUSTER}" ]]; then
     fi
   else
     echo "WARNING: could not reach the cluster to check for load balancers."
+    if [[ "${CI:-}" == "true" ]]; then
+      echo "Running in CI: not continuing without that check. Aborting."
+      exit 1
+    fi
     read -r -p "Continue anyway? [y/N] " cont
     [[ "${cont}" == "y" ]] || { echo "Aborted."; exit 1; }
   fi
@@ -74,8 +78,12 @@ fi
 
 CONFIRM_WORD="${CLUSTER:-destroy}"
 echo
-read -r -p "Type '${CONFIRM_WORD}' to confirm destruction: " answer
-[[ "${answer}" == "${CONFIRM_WORD}" ]] || { echo "Aborted."; rm -f destroy.tfplan; exit 1; }
+if [[ "${CI:-}" == "true" ]]; then
+  echo "Running in CI: confirmation was typed in the workflow and approved at the production gate."
+else
+  read -r -p "Type '${CONFIRM_WORD}' to confirm destruction: " answer
+  [[ "${answer}" == "${CONFIRM_WORD}" ]] || { echo "Aborted."; rm -f destroy.tfplan; exit 1; }
+fi
 
 terraform apply -input=false destroy.tfplan
 rm -f destroy.tfplan
