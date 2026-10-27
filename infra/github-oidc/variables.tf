@@ -3,9 +3,9 @@ variable "region" {
   default = "us-east-1"   
 }
 
-variable "github_repo" {
+variable "github_repo_sub" {
   type    = string
-  default = "PRAISE-C24/example-voting-app"
+  default = "repo:PRAISE-C24@104138599/example-voting-app@1420352531"
 }
 
 variable "state_bucket" { 
