@@ -12,6 +12,10 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  TF_VAR_admin_user_arn: ${{ vars.ADMIN_USER_ARN }}
+  TF_VAR_pipeline_role_arn: ${{ vars.AWS_APPLY_ROLE_ARN }}
+
 concurrency:
   group: terraform-eks
   cancel-in-progress: false

@@ -41,8 +41,30 @@ module "eks" {
 
   endpoint_public_access = true
 
-  # Gives the identity running Terraform admin rights inside the cluster
-  enable_cluster_creator_admin_permissions = true
+  # Explicit access instead of "whoever created it", so the result is the
+  # same whether you or the pipeline runs Terraform
+  enable_cluster_creator_admin_permissions = false
+
+  access_entries = {
+    admin_user = {
+      principal_arn = var.admin_user_arn
+      policy_associations = {
+        admin = {
+          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = { type = "cluster" }
+        }
+      }
+    }
+    pipeline = {
+      principal_arn = var.pipeline_role_arn
+      policy_associations = {
+        admin = {
+          policy_arn   = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+          access_scope = { type = "cluster" }
+        }
+      }
+    }
+  }
 
   # Keep control-plane log storage small
   cloudwatch_log_group_retention_in_days = 7

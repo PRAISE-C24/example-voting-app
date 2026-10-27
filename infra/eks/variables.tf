@@ -33,3 +33,13 @@ variable "node_count" {
   type    = number
   default = 2
 }
+
+variable "admin_user_arn" {
+  type        = string
+  description = "IAM user or role that gets cluster-admin access for kubectl"
+}
+
+variable "pipeline_role_arn" {
+  type        = string
+  description = "GitHub apply role, which the destroy script uses to check the cluster"
+}
