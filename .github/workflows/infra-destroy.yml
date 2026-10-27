@@ -49,6 +49,31 @@ jobs:
           use_lockfile = true
           EOF
 
+      - name: Remove the app and wait for its load balancers to disappear
+        env:
+          CLUSTER_NAME: example-voting-app
+          RELEASE: voting-app
+          NAMESPACE: voting-app
+        run: |
+          if ! aws eks describe-cluster --name "$CLUSTER_NAME" >/dev/null 2>&1; then
+            echo "No cluster, nothing to remove."; exit 0
+          fi
+          aws eks update-kubeconfig --name "$CLUSTER_NAME"
+          if helm status "$RELEASE" --namespace "$NAMESPACE" >/dev/null 2>&1; then
+            helm uninstall "$RELEASE" --namespace "$NAMESPACE" --wait --timeout 5m
+          else
+            echo "Release $RELEASE is not installed."
+          fi
+          for i in $(seq 1 30); do
+            LBS=$(aws resourcegroupstaggingapi get-resources \
+                    --resource-type-filters elasticloadbalancing:loadbalancer \
+                    --tag-filters "Key=elbv2.k8s.aws/cluster,Values=$CLUSTER_NAME" \
+                    --query 'ResourceTagMappingList[].ResourceARN' --output text)
+            [ -z "$LBS" ] && { echo "Load balancers are gone."; exit 0; }
+            echo "Waiting for load balancers to be deleted..."; sleep 10
+          done
+          echo "::error::Load balancers still exist after 5 minutes. Not destroying."; exit 1
+
       - name: Run destroy script
         run: bash scripts/destroy.sh
 
