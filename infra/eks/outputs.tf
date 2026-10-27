@@ -13,3 +13,7 @@ output "cluster_endpoint" {
 output "kubeconfig_command" {
   value = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}"
 }
+
+output "vpc_id" {
+  value = data.aws_vpc.default.id
+}

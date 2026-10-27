@@ -64,3 +64,32 @@ module "eks" {
     }
   }
 }
+
+resource "aws_ec2_tag" "subnet_elb_role" {
+  for_each    = toset(data.aws_subnets.default.ids)
+  resource_id = each.value
+  key         = "kubernetes.io/role/elb"
+  value       = "1"
+}
+
+resource "aws_ec2_tag" "subnet_cluster" {
+  for_each    = toset(data.aws_subnets.default.ids)
+  resource_id = each.value
+  key         = "kubernetes.io/cluster/${var.cluster_name}"
+  value       = "shared"
+}
+
+module "lb_controller_pod_identity" {
+  source  = "terraform-aws-modules/eks-pod-identity/aws"
+  version = "2.10.0"
+
+  name                            = "${var.cluster_name}-lb-controller"
+  attach_aws_lb_controller_policy = true
+}
+
+resource "aws_eks_pod_identity_association" "lb_controller" {
+  cluster_name    = module.eks.cluster_name
+  namespace       = "kube-system"
+  service_account = "aws-load-balancer-controller"
+  role_arn        = module.lb_controller_pod_identity.iam_role_arn
+}
