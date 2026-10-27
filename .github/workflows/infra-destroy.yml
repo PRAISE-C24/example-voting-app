@@ -47,3 +47,38 @@ jobs:
 
       - name: Run destroy script
         run: bash scripts/destroy.sh
+
+  verify:
+    needs: destroy   # runs right after a successful destroy, and is skipped otherwise
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ">= 1.10"
+          terraform_wrapper: false
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Init, so the script can read state
+        working-directory: infra/eks
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=example-voting-app/eks/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION }}" \
+            -backend-config="encrypt=true" \
+            -backend-config="use_lockfile=true"
+
+      - name: Verify nothing is left
+        run: |
+          for attempt in 1 2 3; do
+            bash scripts/verify-destroyed.sh && exit 0
+            echo "Attempt $attempt found leftovers; waiting 90s in case AWS is still cleaning up"
+            [ "$attempt" -lt 3 ] && sleep 90
+          done
+          exit 1      
