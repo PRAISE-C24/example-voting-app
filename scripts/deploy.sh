@@ -25,8 +25,12 @@ terraform plan -input=false -out=tfplan
 echo
 echo "Review the plan above. An EKS cluster costs about 0.10 USD/hour for the"
 echo "control plane plus the worker nodes, until you destroy it."
-read -r -p "Type 'apply' to continue: " answer
-[[ "${answer}" == "apply" ]] || { echo "Aborted."; rm -f tfplan; exit 1; }
+if [[ "${CI:-}" == "true" ]]; then
+  echo "Running in CI: approval was given at the production environment gate."
+else
+  read -r -p "Type 'apply' to continue: " answer
+  [[ "${answer}" == "apply" ]] || { echo "Aborted."; rm -f tfplan; exit 1; }
+fi
 
 terraform apply -input=false tfplan
 rm -f tfplan
