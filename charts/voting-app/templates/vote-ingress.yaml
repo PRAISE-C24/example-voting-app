@@ -1,0 +1,25 @@
+{{- if .Values.vote.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vote
+  labels:
+    app.kubernetes.io/name: vote
+    {{- include "voting-app.labels" . | nindent 4 }}
+  {{- with .Values.vote.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.vote.ingress.className }}
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vote
+                port:
+                  number: {{ .Values.vote.service.port }}
+{{- end }}

@@ -17,6 +17,13 @@ vote:
       memory: 64Mi
     limits:
       memory: 256Mi
+  ingress:
+    enabled: true
+    className: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/healthcheck-path: /    
 
 result:
   image: voting-app-result
@@ -32,6 +39,14 @@ result:
       memory: 64Mi
     limits:
       memory: 256Mi
+  ingress:
+    enabled: true
+    className: alb
+    annotations:
+      alb.ingress.kubernetes.io/scheme: internet-facing
+      alb.ingress.kubernetes.io/target-type: ip
+      alb.ingress.kubernetes.io/healthcheck-path: /
+      alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=3600    
 
 worker:
   image: voting-app-worker
