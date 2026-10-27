@@ -95,3 +95,45 @@ resource "aws_iam_role_policy" "plan_state" {
   role   = aws_iam_role.plan.id
   policy = data.aws_iam_policy_document.plan_state.json
 }
+
+data "aws_caller_identity" "current" {}
+
+# Deploy role: only jobs in the "app-production" environment
+data "aws_iam_policy_document" "deploy_trust" {
+  statement {
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.github.arn]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:aud"
+      values   = ["sts.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "token.actions.githubusercontent.com:sub"
+      values   = ["${var.github_repo_sub}:environment:app-production"]
+    }
+  }
+}
+
+resource "aws_iam_role" "deploy" {
+  name               = "gha-app-deploy"
+  assume_role_policy = data.aws_iam_policy_document.deploy_trust.json
+}
+
+# Its only AWS permission: look up the cluster to build a kubeconfig
+data "aws_iam_policy_document" "deploy_permissions" {
+  statement {
+    actions   = ["eks:DescribeCluster"]
+    resources = ["arn:aws:eks:${var.region}:${data.aws_caller_identity.current.account_id}:cluster/${var.cluster_name}"]
+  }
+}
+
+resource "aws_iam_role_policy" "deploy" {
+  name   = "describe-cluster"
+  role   = aws_iam_role.deploy.id
+  policy = data.aws_iam_policy_document.deploy_permissions.json
+}

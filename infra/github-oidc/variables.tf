@@ -12,3 +12,8 @@ variable "state_bucket" {
   type = string 
   default = "tfstate-663001881484-us-east-1"
 }
+
+variable "cluster_name" {
+  type    = string
+  default = "example-voting-app" # must match cluster_name in infra/eks
+}
