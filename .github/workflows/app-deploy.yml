@@ -82,6 +82,21 @@ jobs:
       - name: Point kubectl at the cluster
         run: aws eks update-kubeconfig --name "$CLUSTER_NAME"
 
+      - name: Ensure the AWS Load Balancer Controller is installed
+        env:
+          REGION: ${{ vars.AWS_REGION }}
+        run: |
+          VPC_ID=$(aws eks describe-cluster --name "$CLUSTER_NAME" \
+                     --query cluster.resourcesVpcConfig.vpcId --output text)
+          helm repo add eks https://aws.github.io/eks-charts
+          helm repo update eks
+          helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+            --namespace kube-system --version 3.6.1 \
+            --set clusterName="$CLUSTER_NAME" \
+            --set region="$REGION" \
+            --set vpcId="$VPC_ID" \
+            --wait --timeout 5m
+
       - name: Decide which image versions to run
         id: tag
         env:
